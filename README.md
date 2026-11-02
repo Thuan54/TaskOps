@@ -61,7 +61,7 @@ Backup archive ── rsync ──► VM2 (taskops-backup) : /srv/backup/incomin
 
 ---
 
-## 5. Repository layout
+## 3. Repository layout
 ```
 taskops
 ├── README.md                      
@@ -93,7 +93,7 @@ taskops
 
 --- 
 
-## 7. Security baseline (summary)
+## 4. Security baseline (summary)
 
 | Control | Implementation |
 |---|---|
