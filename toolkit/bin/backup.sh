@@ -10,6 +10,7 @@ WEB_APP_DIR="/var/www/taskops-app"
 WEB_STATUS_DIR="/var/www/taskops-status"
 BACKUP_DIR="/srv/backup"
 MIN_FREE_MB=500
+RETENTION_DAYS=7
 
 # Giả lập hàm log (sau này lấy của F1)
 log() { printf '%s [%s] %s\n' "$(date '+%F %T')" "$1" "$2" >&2; }
@@ -68,6 +69,39 @@ preflight() {
     log INFO "Preflight OK (còn trống ${free_mb}MB)"
 }
 
+# RETENTION: xóa bản backup tồn tại quá lâu
+apply_retention() {
+    # RETENTION_DAYS phải là số nguyên >= 1.
+    # Nếu rỗng/chữ/0 thì find sẽ khớp MỌI file và xóa sạch backup.
+    if ! [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( RETENTION_DAYS < 1 )); then
+        log ERROR "RETENTION_DAYS không hợp lệ: '$RETENTION_DAYS' (cần số nguyên >= 1)"
+        return 1
+    fi
+
+    # Đổi ngày ra phút để so sánh chính xác
+    local max_age_min=$(( RETENTION_DAYS * 24 * 60 ))
+    # file dùng lưu đường dẫn file quét được, deleted đếm số lượng file đã xóa
+    local file deleted=0
+
+    log INFO "Retention: xóa backup cũ hơn ${RETENTION_DAYS} ngày"
+
+    # find liệt kê file cần xóa:
+    #   -maxdepth 1  : chỉ xét trực tiếp trong BACKUP_DIR, không vào thư mục con
+    #   -type f      : chỉ file thường (bỏ qua thư mục .work.*)
+    #   -name        : chỉ file đúng mẫu tên của script backup
+    #   -mmin +N     : sửa đổi lần cuối cách đây hơn N phút
+    # Vòng while đọc từng tên file (read -d '' khớp với -print0).
+    while IFS= read -r -d '' file; do
+        rm -f -- "$file"      
+        log INFO "Đã xóa bản cũ: $file"
+        deleted=$(( deleted + 1 ))
+    done < <(find "$BACKUP_DIR" -maxdepth 1 -type f \
+                  -name 'taskops_backup_*.tar' \
+                  -mmin +"$max_age_min" -print0)
+
+    log INFO "Retention xong: đã xóa ${deleted} bản"
+}
+
 # Luồng backup chính
 main() {
     preflight
@@ -106,6 +140,10 @@ main() {
     mv "$WORK_DIR/final.tar" "$final"
 
     log INFO "Backup xong: $final ($(du -h "$final" | cut -f1))"
+
+    # Retention lỗi thì chỉ cảnh báo, vì bản backup mới vẫn hợp lệ.
+    apply_retention || log WARN "Retention gặp lỗi, backup mới vẫn hợp lệ"
+
     echo "$final"
 }
 
