@@ -239,8 +239,3 @@ main() {
         log WARN "Retention gặp lỗi, backup mới vẫn hợp lệ"
         send_alert WARN "Sao lưu hoàn tất nhưng dọn dẹp bản cũ (retention) gặp sự cố"
     fi
-
-    echo "$final"
-}
-
-main "$@"
