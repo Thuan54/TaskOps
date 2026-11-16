@@ -1,0 +1,2 @@
+2026-11-16 09:44:03,131 fail2ban.actions        [51402]: NOTICE  [sshd] Ban 192.168.71.1
+2026-11-16 09:44:53,890 fail2ban.actions        [51402]: NOTICE  [sshd] Unban 192.168.71.1
