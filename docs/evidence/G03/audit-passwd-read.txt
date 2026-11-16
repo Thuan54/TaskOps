@@ -1,0 +1,5 @@
+----
+type=PROCTITLE msg=audit(16/11/2026 09:57:43.913:799) : proctitle=cat /etc/passwd
+type=PATH msg=audit(16/11/2026 09:57:43.913:799) : item=0 name=/etc/passwd inode=1881059 dev=08:03 mode=file,644 ouid=root ogid=root rdev=00:00 nametype=NORMAL cap_fp=none cap_fi=none cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(16/11/2026 09:57:43.913:799) : cwd=/home/nguyennhat/projects/taskops
+type=SYSCALL msg=audit(16/11/2026 09:57:43.913:799) : arch=x86_64 syscall=openat success=yes exit=3 a0=AT_FDCWD a1=0x7ffd21f2e3a4 a2=O_RDONLY a3=0x0 items=1 ppid=2259 pid=51671 auid=nguyennhat uid=nguyennhat gid=nguyennhat euid=nguyennhat suid=nguyennhat fsuid=nguyennhat egid=nguyennhat sgid=nguyennhat fsgid=nguyennhat tty=pts0 ses=3 comm=cat exe=/usr/bin/cat subj=unconfined key=taskops_identity
