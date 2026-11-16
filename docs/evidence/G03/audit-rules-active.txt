@@ -1,0 +1,2 @@
+-w /etc/passwd -p rwa -k taskops_identity
+-w /etc/shadow -p rwa -k taskops_identity

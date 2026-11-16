@@ -1,0 +1,5 @@
+----
+type=PROCTITLE msg=audit(16/11/2026 09:57:50.794:804) : proctitle=sudo ausearch -k taskops_identity -ts recent -i
+type=PATH msg=audit(16/11/2026 09:57:50.794:804) : item=0 name=/etc/shadow inode=1881058 dev=08:03 mode=file,640 ouid=root ogid=shadow rdev=00:00 nametype=NORMAL cap_fp=none cap_fi=none cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(16/11/2026 09:57:50.794:804) : cwd=/home/nguyennhat/projects/taskops
+type=SYSCALL msg=audit(16/11/2026 09:57:50.794:804) : arch=x86_64 syscall=openat success=yes exit=7 a0=AT_FDCWD a1=0x7003ef9dc2c4 a2=O_RDONLY|O_CLOEXEC a3=0x0 items=1 ppid=2259 pid=51672 auid=nguyennhat uid=nguyennhat gid=nguyennhat euid=root suid=root fsuid=root egid=nguyennhat sgid=nguyennhat fsgid=nguyennhat tty=pts0 ses=3 comm=sudo exe=/usr/bin/sudo subj=unconfined key=taskops_identity
