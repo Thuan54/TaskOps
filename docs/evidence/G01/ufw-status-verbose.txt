@@ -1,0 +1,13 @@
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere                   # SSH - personal lab
+80/tcp                     ALLOW IN    Anywhere                   # TaskOps HTTP
+443/tcp                    ALLOW IN    Anywhere                   # TaskOps HTTPS
+22/tcp (v6)                ALLOW IN    Anywhere (v6)              # SSH - personal lab
+80/tcp (v6)                ALLOW IN    Anywhere (v6)              # TaskOps HTTP
+443/tcp (v6)               ALLOW IN    Anywhere (v6)              # TaskOps HTTPS
