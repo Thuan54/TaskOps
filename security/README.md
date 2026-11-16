@@ -71,3 +71,79 @@ luật SSH và kiểm thử trên mạng thực tế trước khi áp dụng lê
 
 VM2 chỉ mở các cổng cần cho vai trò sao lưu; không áp dụng mặc định
 các luật mở cổng web của VM1.
+## G02 — SSH hardening và Fail2ban
+
+### Cấu hình SSH
+
+File: security/ssh/00-taskops-hardening.conf
+
+- Cấm root đăng nhập SSH.
+- Chỉ cho tài khoản nguyennhat đăng nhập trên máy thực hành.
+- Yêu cầu xác thực bằng khóa công khai.
+- Tắt xác thực bằng mật khẩu và keyboard-interactive.
+
+Đã kiểm thử đăng nhập bằng khóa từ Windows thành công trước khi
+tắt mật khẩu. Khóa riêng được giữ trên Windows, không đưa vào repo.
+
+Cài đặt từ thư mục gốc repository, sau khi tài khoản được phép
+đăng nhập đã có khóa công khai trong ~/.ssh/authorized_keys:
+
+```bash
+sudo install -o root -g root -m 644 \
+    security/ssh/00-taskops-hardening.conf \
+    /etc/ssh/sshd_config.d/00-taskops-hardening.conf
+
+sudo /usr/sbin/sshd -t
+sudo /usr/sbin/sshd -T
+```
+
+Chỉ reload sau khi kiểm tra cấu hình hợp lệ và đúng chính sách:
+
+```bash
+sudo systemctl reload ssh
+```
+
+Giữ console VM mở và kiểm thử kết nối SSH mới sau khi reload.
+Trên VM nhóm, phải điều chỉnh AllowUsers cho các thành viên và
+tài khoản sao lưu cần truy cập.
+
+### Fail2ban
+
+File: security/fail2ban/sshd.local
+
+- Bật jail sshd, bảo vệ cổng 22.
+- Đọc log từ systemd journal.
+- Ban khi ghi nhận 5 lỗi trong 10 phút.
+- Thời gian ban: 5 phút.
+- Miễn chặn địa chỉ loopback.
+
+Cài đặt và kiểm tra:
+
+```bash
+sudo install -o root -g root -m 644 \
+    security/fail2ban/sshd.local \
+    /etc/fail2ban/jail.d/sshd.local
+
+sudo fail2ban-client -t
+sudo systemctl enable --now fail2ban
+sudo fail2ban-client status sshd
+```
+
+Quy trình trên dùng khi Fail2ban chưa chạy. Nếu sửa cấu hình khi
+dịch vụ đang chạy, kiểm tra lại rồi reload bằng fail2ban-client reload.
+
+### Kết quả kiểm thử trên máy thực hành
+
+- Windows đăng nhập nguyennhat bằng khóa thành công.
+- Thử xác thực bằng mật khẩu bị từ chối: Permission denied (publickey).
+- Các lần đăng nhập bằng user không hợp lệ từ Windows kích hoạt ban.
+- Fail2ban ghi nhận Total failed: 5 và ban IP 192.168.71.1.
+- Sau khi gỡ ban qua console VMware, đăng nhập bằng khóa thành công lại.
+
+Lệnh gỡ ban dùng trong buổi thực hành:
+
+```bash
+sudo fail2ban-client set sshd unbanip 192.168.71.1
+```
+
+Bằng chứng được lưu tại docs/evidence/G02/.
