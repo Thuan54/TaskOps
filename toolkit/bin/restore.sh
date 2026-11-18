@@ -16,6 +16,17 @@
 # -e: lệnh lỗi thì dừng; -u: biến chưa khai báo thì lỗi; pipefail: lỗi trong pipe tính là lỗi
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+LIB_DIR="$(cd -- "$SCRIPT_DIR/../lib" &>/dev/null && pwd)"
+
+if [[ -f "$LIB_DIR/alert.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$LIB_DIR/alert.sh"
+fi
+if ! declare -F send_alert >/dev/null; then
+    send_alert() { :; }
+fi
+
 # ===== CẤU HÌNH (sau này do lib/config.sh cung cấp) =====
 : "${DB_NAME:=taskops_db}"
 : "${DB_APP_USER:=taskops_user}"            # role của ứng dụng (quyền tối thiểu)
@@ -29,7 +40,11 @@ set -Eeuo pipefail
 # Log ghi ra stderr, giống backup.sh
 log() { printf '%s [%s] %s\n' "$(date '+%F %T')" "$1" "$2" >&2; }
 # báo lỗi rồi dừng script
-die() { log ERROR "$1"; exit 1; }
+die() {
+    log ERROR "$1"
+    send_alert CRIT "Restore thất bại: $1"
+    exit 1
+}
 
 # chạy 1 lệnh bất kì dưới quyền postgres
 as_postgres() { ( cd / && sudo -u postgres "$@" ); }
@@ -60,7 +75,11 @@ cleanup() {
         rm -rf "$WORK_DIR"
     fi
 }
-on_error() { log ERROR "Restore thất bại ở dòng $1"; }
+on_error() {
+    local line="$1"
+    log ERROR "Restore thất bại ở dòng $line"
+    send_alert CRIT "Restore gặp lỗi bất ngờ ở dòng $line"
+}
 
 trap 'on_error $LINENO' ERR
 trap cleanup EXIT
@@ -330,6 +349,9 @@ main() {
     select_archive
     validate_and_extract     # kiểm tra kỹ TRƯỚC khi đụng vào hệ thống
     confirm
+
+    send_alert WARN "Bắt đầu restore hệ thống (chế độ: $MODE) từ $(basename "$ARCHIVE") bởi $(whoami)"
+
     safety_backup
 
     if [[ "$MODE" != "web" ]]; then restore_database; fi
@@ -337,6 +359,7 @@ main() {
 
     verify
     log INFO "Restore hoàn tất từ: $ARCHIVE"
+    send_alert INFO "Restore hoàn tất thành công từ $(basename "$ARCHIVE") (chế độ: $MODE)"
 }
 
 main "$@"

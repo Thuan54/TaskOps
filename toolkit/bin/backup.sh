@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 # backup.sh - Sao lưu PostgreSQL + nội dung web thành một archive có timestamp
 # Archive gồm: db.sql.gz, web_app.tar.gz, web_status.tar.gz
-set -euo pipefail
+# -E: để trap ERR hoạt động bên trong các hàm
+set -Eeuo pipefail
+
+# Xác định thư mục lib và nạp alert.sh trước khi cd /
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+LIB_DIR="$(cd -- "$SCRIPT_DIR/../lib" &>/dev/null && pwd)"
+
+if [[ -f "$LIB_DIR/alert.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$LIB_DIR/alert.sh"
+fi
+if ! declare -F send_alert >/dev/null; then
+    send_alert() { :; }
+fi
+
 cd /  
 
 # Gán cứng, sau này lấy từ interface
@@ -14,6 +28,12 @@ RETENTION_DAYS=7
 
 # Giả lập hàm log (sau này lấy của F1)
 log() { printf '%s [%s] %s\n' "$(date '+%F %T')" "$1" "$2" >&2; }
+# Báo lỗi, gửi alert và dừng script
+die() {
+    log ERROR "$1"
+    send_alert CRIT "Sao lưu thất bại: $1"
+    exit 1
+}
 
 WORK_DIR=""
 cleanup() {
@@ -22,7 +42,11 @@ cleanup() {
         rm -rf "$WORK_DIR"
     fi
 }
-on_error() { log ERROR "Backup thất bại ở dòng $1"; }
+on_error() {
+    local exit_code=$?
+    log ERROR "Backup thất bại ở dòng $1 (exit code: $exit_code)"
+    send_alert CRIT "Sao lưu thất bại tại dòng $1 (mã lỗi: $exit_code)"
+}
 
 # Lắng nghe tín hiệu ERR,khi có lỗi nó kích hoạt hàm on_error() kèm theo số dòng
 trap 'on_error $LINENO' ERR
@@ -33,12 +57,12 @@ trap cleanup EXIT
 preflight() {
     # Lệnh backup yêu cầu chạy với quyền sudo
     if [[ $EUID -ne 0 ]]; then
-        log ERROR "Cần chạy bằng root (sudo)"; exit 1
+        die "Cần chạy bằng root (sudo)"
     fi
 
     # Thực mục backup phải tồn tại
     if [[ ! -d "$BACKUP_DIR" || ! -w "$BACKUP_DIR" ]]; then
-        log ERROR "Thư mục backup không tồn tại hoặc không ghi được: $BACKUP_DIR"; exit 1
+        die "Thư mục backup không tồn tại hoặc không ghi được: $BACKUP_DIR"
     fi
 
     # biến dùng duyệt đường dẫn thư mục web
@@ -46,13 +70,13 @@ preflight() {
     for d in "$WEB_APP_DIR" "$WEB_STATUS_DIR"; do
         # Thư mục web phải tồn tại
         if [[ ! -d "$d" ]]; then
-            log ERROR "Thiếu thư mục web: $d"; exit 1
+            die "Thiếu thư mục web: $d"
         fi
     done
 
     # PostgreSQL phải hoạt động
     if ! pg_isready -q; then
-        log ERROR "PostgreSQL không sẵn sàng"; exit 1
+        die "PostgreSQL không sẵn sàng"
     fi
 
     # Biến lưu dung lượng đĩa trống
@@ -62,7 +86,7 @@ preflight() {
 
     # Nếu dung lượng trống hiện tại nhỏ hơn ngưỡng tối thiểu cho phép để backup
     if (( free_mb < MIN_FREE_MB )); then
-        log ERROR "Đĩa còn ${free_mb}MB, thấp hơn ngưỡng ${MIN_FREE_MB}MB"; exit 1
+        die "Đĩa còn ${free_mb}MB, thấp hơn ngưỡng ${MIN_FREE_MB}MB"
     fi
 
     # Thành công thì in log thông báo
@@ -139,10 +163,16 @@ main() {
     # thư mục tạm tự động được xóa do có cấu hình trap cleanup EXIT
     mv "$WORK_DIR/final.tar" "$final"
 
-    log INFO "Backup xong: $final ($(du -h "$final" | cut -f1))"
+    local size
+    size=$(du -h "$final" | cut -f1)
+    log INFO "Backup xong: $final ($size)"
+    send_alert INFO "Sao lưu thành công: $(basename "$final") ($size)"
 
     # Retention lỗi thì chỉ cảnh báo, vì bản backup mới vẫn hợp lệ.
-    apply_retention || log WARN "Retention gặp lỗi, backup mới vẫn hợp lệ"
+    if ! apply_retention; then
+        log WARN "Retention gặp lỗi, backup mới vẫn hợp lệ"
+        send_alert WARN "Sao lưu hoàn tất nhưng dọn dẹp bản cũ (retention) gặp sự cố"
+    fi
 
     echo "$final"
 }
