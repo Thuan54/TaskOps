@@ -1,0 +1,28 @@
+# /etc/systemd/system/todo-backup.service
+# Chạy sao lưu TaskOps (DB + web, nén, retention, rsync sang VM2) thông qua toolkit.
+# Được todo-backup.timer kích hoạt lúc 02:00 mỗi ngày; có thể chạy tay: systemctl start todo-backup.service
+[Unit]
+Description=TaskOps - Sao lưu hằng ngày (DB + web, retention 7 ngày, rsync sang VM2)
+Documentation=file:/opt/taskops-toolkit/toolkit.sh
+Wants=network-online.target
+After=network-online.target postgresql.service
+# Đĩa sao lưu (mount qua /etc/fstab) phải sẵn sàng, nếu không unit sẽ lỗi thay vì ghi nhầm vào đĩa hệ thống
+RequiresMountsFor=/srv/backup
+# Khi lỗi (script thoát khác 0, quá thời gian, đĩa chưa mount) thì gửi cảnh báo
+OnFailure=todo-alert@%N.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+# Chạy bằng bash để không phụ thuộc quyền thực thi của file
+ExecStart=/usr/bin/bash /opt/taskops-toolkit/toolkit.sh backup
+# Log của toolkit ghi vào /var/log/taskops/toolkit.log; stdout/stderr đồng thời vào journald
+Environment=TASKOPS_LOG_DIR=/var/log/taskops
+SyslogIdentifier=todo-backup
+StandardOutput=journal
+StandardError=journal
+# Không làm chậm dịch vụ web trong lúc sao lưu
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h

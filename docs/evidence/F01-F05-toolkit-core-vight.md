@@ -1,6 +1,7 @@
 # F01–F05: Toolkit Core (Bash)
 
 Người thực hiện: Nguyễn Tấn Vinh  ·  Ngày: 14/11/2026
+
 Thư mục mã nguồn: `toolkit/` (`toolkit.sh`, `lib/common.sh`, `lib/log.sh`, `lib/validate.sh`, `_template.sh`)
 Môi trường thử nghiệm: Ubuntu 24.04, ShellCheck 0.9.0. Mọi lệnh bên dưới chạy từ thư mục gốc của repo (`~/taskops`).
 
