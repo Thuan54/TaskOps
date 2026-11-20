@@ -1,0 +1,13 @@
+# /etc/systemd/system/todo-alert@.service
+# Unit mẫu (template) gửi cảnh báo khi một unit khác thất bại.
+# Dùng: OnFailure=todo-alert@%N.service  ->  %i ở đây là tên unit bị lỗi, không có đuôi (ví dụ todo-backup)
+[Unit]
+Description=TaskOps - Gửi cảnh báo khi %i thất bại
+
+[Service]
+Type=oneshot
+# GIẢ ĐỊNH: alert.sh nhận 2 tham số (tiêu đề, nội dung) và nằm ở toolkit/bin/.
+# Cần chỉnh cho khớp giao diện thật của alert.sh (task F13).
+# Dấu '-' phía trước: nếu lệnh gửi cảnh báo lỗi thì không đánh dấu unit này là lỗi.
+ExecStart=-/usr/bin/bash /opt/taskops-toolkit/bin/alert.sh "[TaskOps] %i thất bại trên %H" "Xem chi tiết: journalctl -u %i -n 50 --no-pager"
+SyslogIdentifier=todo-alert
