@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ============================================================================
-# _template.sh - MẪU cho các công cụ con (deploy, backup, restore, ...)
-# Sao chép file này, đổi tên, rồi sửa phần "NỘI DUNG".
+# lib/template.sh - MẪU cho các công cụ con (deploy, backup, restore, ...)
+# Sao chép file này ra toolkit/ (ví dụ toolkit/backup.sh), rồi sửa phần "NỘI DUNG".
 #
 # Mẫu đã có sẵn: strict mode + trap (qua lib/common.sh), getopts, --help,
 # kiểm tra đầu vào, ghi log có cấu trúc.
 # ============================================================================
-# Tìm thư mục gốc của toolkit (chứa lib/), dù script nằm ở toolkit/ hay toolkit/bin/
+# Tìm thư mục gốc của toolkit (chứa lib/); chạy được cả khi file còn nằm trong lib/ lẫn khi đã chép ra toolkit/
 _here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 if [[ -f "$_here/lib/common.sh" ]]; then
   TOOLKIT_DIR="$_here"

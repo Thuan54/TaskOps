@@ -14,7 +14,7 @@ source "$TOOLKIT_DIR/lib/common.sh"
 # shellcheck disable=SC2034 # biến này được lib/log.sh sử dụng
 LOG_COMPONENT="toolkit"
 
-# Các công cụ do toolkit điều phối. Mỗi công cụ là một script <lệnh>.sh trong toolkit/bin/ (hoặc toolkit/).
+# Các công cụ do toolkit điều phối. Mỗi công cụ là một script <lệnh>.sh nằm trong toolkit/ (theo README).
 readonly COMMANDS=(deploy backup restore healthcheck logrotate)
 declare -A COMMAND_DESC=(
   [deploy]="Triển khai app/web (test -> reload -> verify, rollback khi lỗi)"
@@ -106,17 +106,11 @@ run_command() {
   shift
   validate_choice "lệnh" "$cmd" "${COMMANDS[@]}"
 
-  # Tìm script ở toolkit/bin/ trước, rồi tới toolkit/ (nhóm có thể đặt ở một trong hai chỗ).
+  # Theo README của nhóm, script con nằm trực tiếp trong toolkit/ (toolkit/<lệnh>.sh).
   # Dùng return (không dùng die) để menu không bị thoát khi một công cụ chưa sẵn sàng.
-  local script="" dir
-  for dir in "$TOOLKIT_DIR/bin" "$TOOLKIT_DIR"; do
-    if [[ -f "$dir/$cmd.sh" ]]; then
-      script="$dir/$cmd.sh"
-      break
-    fi
-  done
-  if [[ -z "$script" ]]; then
-    log_error "Chưa có script cho lệnh '$cmd'" "path=$TOOLKIT_DIR/bin/$cmd.sh"
+  local script="$TOOLKIT_DIR/$cmd.sh"
+  if [[ ! -f "$script" ]]; then
+    log_error "Chưa có script cho lệnh '$cmd'" "path=$script"
     return "$EX_NOFILE"
   fi
 
