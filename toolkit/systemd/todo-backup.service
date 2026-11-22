@@ -8,8 +8,6 @@ Wants=network-online.target
 After=network-online.target postgresql.service
 # Đĩa sao lưu (mount qua /etc/fstab) phải sẵn sàng, nếu không unit sẽ lỗi thay vì ghi nhầm vào đĩa hệ thống
 RequiresMountsFor=/srv/backup
-# Khi lỗi (script thoát khác 0, quá thời gian, đĩa chưa mount) thì gửi cảnh báo
-OnFailure=todo-alert@%N.service
 
 [Service]
 Type=oneshot
@@ -26,3 +24,7 @@ StandardError=journal
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=2h
+# Khi sao lưu thất bại (SERVICE_RESULT khác success: script thoát khác 0, quá thời gian...) thì gửi cảnh báo qua alert.sh (F13).
+# GIẢ ĐỊNH: alert.sh nhận 2 tham số (tiêu đề, nội dung); chỉnh cho khớp alert.sh thật.
+# Dấu '-' ở đầu: lỗi của alert.sh không làm đổi kết quả của service. $$ là cách viết ký tự $ trong file unit.
+ExecStopPost=-/usr/bin/bash -c 'if [ "$$SERVICE_RESULT" != "success" ]; then exec /usr/bin/bash /opt/taskops-toolkit/alert.sh "[TaskOps] %n thất bại trên %H" "Kết quả: $$SERVICE_RESULT. Xem: journalctl -u %n -n 50 --no-pager"; fi'

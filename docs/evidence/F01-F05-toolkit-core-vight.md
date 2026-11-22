@@ -2,7 +2,7 @@
 
 Người thực hiện: Nguyễn Tấn Vinh  ·  Ngày: 14/11/2026
 
-Thư mục mã nguồn: `toolkit/` (`toolkit.sh`, `lib/common.sh`, `lib/log.sh`, `lib/validate.sh`, `_template.sh`)
+Thư mục mã nguồn: `toolkit/` (`toolkit.sh`, `lib/common.sh`, `lib/log.sh`, `lib/validate.sh`, `lib/template.sh`)
 Môi trường thử nghiệm: Ubuntu 24.04, ShellCheck 0.9.0. Mọi lệnh bên dưới chạy từ thư mục gốc của repo (`~/taskops`).
 
 | Task | Nội dung | Điểm |
@@ -20,7 +20,7 @@ Môi trường thử nghiệm: Ubuntu 24.04, ShellCheck 0.9.0. Mọi lệnh bên
 **Tại sao cần:** Đề bài yêu cầu một menu CLI làm điểm vào, điều phối tới deploy, backup, restore, healthcheck, logrotate và xử lý được nhập sai. Một entry point duy nhất giúp người vận hành không phải nhớ đường dẫn từng script, và các script của các thành viên khác cùng dùng chung thư viện `lib/`.
 
 **Đã làm:**
-- Cấu trúc: `toolkit/toolkit.sh` (entry point), `toolkit/lib/` (`common.sh`, `log.sh`, `validate.sh`), `toolkit/_template.sh` (mẫu cho các script con).
+- Cấu trúc: `toolkit/toolkit.sh` (entry point), `toolkit/lib/` (`common.sh`, `log.sh`, `validate.sh`), `toolkit/lib/template.sh` (mẫu cho các script con).
 - `toolkit.sh` hiện menu 0–6. Nhập sai thì báo lỗi và hỏi lại; Enter hiện lại menu; Ctrl+D thoát gọn.
 - Một công cụ lỗi hoặc chưa có script thì quay lại menu, không làm thoát cả toolkit.
 - Tham số bổ sung nhập ở menu được kiểm tra ký tự (chỉ chữ, số và `_ . / = : , @ -`) trước khi chuyền xuống công cụ.
@@ -46,7 +46,7 @@ Menu mục 6 (xem log gần đây); khi chưa có file log thì báo rõ đườ
 
 **Tại sao cần:** Đề bài yêu cầu mỗi công cụ có output `--help`. Người dùng mới và người chấm cần biết cú pháp, tùy chọn, ví dụ và mã thoát mà không phải đọc mã nguồn.
 
-**Đã làm:** `toolkit.sh -h|--help` liệt kê cách dùng, tùy chọn chung, danh sách lệnh, ví dụ và bảng mã thoát. `toolkit.sh help <lệnh>` và `toolkit.sh <lệnh> --help` chuyển sang hướng dẫn riêng của công cụ con. `_template.sh` có sẵn hàm `usage()` để các script khác làm theo.
+**Đã làm:** `toolkit.sh -h|--help` liệt kê cách dùng, tùy chọn chung, danh sách lệnh, ví dụ và bảng mã thoát. `toolkit.sh help <lệnh>` và `toolkit.sh <lệnh> --help` chuyển sang hướng dẫn riêng của công cụ con. `lib/template.sh` có sẵn hàm `usage()` để các script khác làm theo.
 
 **Cách kiểm chứng:**
 ```
@@ -99,7 +99,7 @@ Tùy chọn `--json` cho log dạng JSON (xem ảnh ở mục F04).
 ```
 ./toolkit/toolkit.sh --json backup
 tail -5 ~/.local/state/taskops/toolkit.log
-LOG_LEVEL=DEBUG ./toolkit/_template.sh -n 7
+LOG_LEVEL=DEBUG ./toolkit/lib/template.sh -n 7
 ```
 
 **Bằng chứng:**
@@ -126,9 +126,9 @@ Mức DEBUG hiện thêm dòng `Kết thúc thành công` kèm `duration_s` (ả
 
 **Cách kiểm chứng:**
 ```
-shellcheck -x toolkit/toolkit.sh toolkit/_template.sh toolkit/lib/*.sh && echo "SHELLCHECK SẠCH"
-./toolkit/_template.sh -n abc; echo $?     # sai đầu vào -> mã thoát 2
-./toolkit/_template.sh -n 7; echo $?       # đúng       -> mã thoát 0
+shellcheck -x toolkit/toolkit.sh toolkit/lib/template.sh toolkit/lib/*.sh && echo "SHELLCHECK SẠCH"
+./toolkit/lib/template.sh -n abc; echo $?     # sai đầu vào -> mã thoát 2
+./toolkit/lib/template.sh -n 7; echo $?       # đúng       -> mã thoát 0
 ./toolkit/toolkit.sh foo; echo $?          # lệnh sai   -> mã thoát 2
 ./toolkit/toolkit.sh -v backup; echo $?    # chưa có script -> mã thoát 5
 ```
