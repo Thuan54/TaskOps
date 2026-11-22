@@ -69,7 +69,9 @@ Chạy tay một lần thành công (`status=0/SUCCESS`, log vào journald và f
 
 Mô phỏng lỗi: service thất bại (`failed`), `ExecStopPost` gọi `alert.sh` và cảnh báo được ghi lại:
 
-![Lỗi và cảnh báo](img/f15-loi-va-canh-bao.png)
+![Lỗi và cảnh báo](img/f15-loi-va-canh-bao-1.png)
+
+![Lỗi và cảnh báo](img/f15-loi-va-canh-bao-2.png)
 
 Bật timer khi đã lỡ lịch 02:00 của các ngày trước: nhờ `Persistent=true`, systemd chạy bù ngay một lần (dòng 09:26:28 trong log), đúng như thiết kế:
 
