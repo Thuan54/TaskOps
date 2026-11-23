@@ -1,0 +1,30 @@
+# /etc/systemd/system/todo-backup.service
+# Chạy sao lưu TaskOps (DB + web, nén, retention, rsync sang VM2) thông qua toolkit.
+# Được todo-backup.timer kích hoạt lúc 02:00 mỗi ngày; có thể chạy tay: systemctl start todo-backup.service
+[Unit]
+Description=TaskOps - Sao lưu hằng ngày (DB + web, retention 7 ngày, rsync sang VM2)
+Documentation=file:/opt/taskops-toolkit/toolkit.sh
+Wants=network-online.target
+After=network-online.target postgresql.service
+# Đĩa sao lưu (mount qua /etc/fstab) phải sẵn sàng, nếu không unit sẽ lỗi thay vì ghi nhầm vào đĩa hệ thống
+RequiresMountsFor=/srv/backup
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+# Chạy bằng bash để không phụ thuộc quyền thực thi của file
+ExecStart=/usr/bin/bash /opt/taskops-toolkit/toolkit.sh backup
+# Log của toolkit ghi vào /var/log/taskops/toolkit.log; stdout/stderr đồng thời vào journald
+Environment=TASKOPS_LOG_DIR=/var/log/taskops
+SyslogIdentifier=todo-backup
+StandardOutput=journal
+StandardError=journal
+# Không làm chậm dịch vụ web trong lúc sao lưu
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h
+# Khi sao lưu thất bại (SERVICE_RESULT khác success: script thoát khác 0, quá thời gian...) thì gửi cảnh báo qua alert.sh (F13).
+# GIẢ ĐỊNH: alert.sh nhận 2 tham số (tiêu đề, nội dung); chỉnh cho khớp alert.sh thật.
+# Dấu '-' ở đầu: lỗi của alert.sh không làm đổi kết quả của service. $$ là cách viết ký tự $ trong file unit.
+ExecStopPost=-/usr/bin/bash -c 'if [ "$$SERVICE_RESULT" != "success" ]; then exec /usr/bin/bash /opt/taskops-toolkit/alert.sh "[TaskOps] %n thất bại trên %H" "Kết quả: $$SERVICE_RESULT. Xem: journalctl -u %n -n 50 --no-pager"; fi'
