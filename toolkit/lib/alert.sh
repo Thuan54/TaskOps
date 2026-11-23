@@ -6,8 +6,9 @@
 #   source "$SCRIPT_DIR/../lib/alert.sh"
 #   send_alert CRIT "Nginx đã dừng"
 #
-# CÁCH TEST TRỰC TIẾP:
+# CÁCH TEST / GỌI TRỰC TIẾP TỪ CLI HOẶC SYSTEMD:
 #   sudo ./toolkit/lib/alert.sh CRIT "Tin nhắn thử"
+#   sudo ./toolkit/lib/alert.sh "[TaskOps] Service lỗi" "Chi tiết lỗi"
 #
 # NGUYÊN TẮC THIẾT KẾ:
 #   1. Bí mật (token, chat id) nằm trong file RIÊNG ngoài repo, quyền 600
@@ -113,8 +114,18 @@ send_alert() {
     return 0
 }
 
-# CHẾ ĐỘ CHẠY TRỰC TIẾP (để test) 
+# CHẾ ĐỘ CHẠY TRỰC TIẾP (để test hoặc systemd OnFailure/ExecStopPost gọi)
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     set -euo pipefail
-    send_alert "${1:-INFO}" "${2:-Tin nhắn thử từ alert.sh}"
+    arg1="${1:-INFO}"
+    arg2="${2:-Tin nhắn thử từ alert.sh}"
+    case "${arg1^^}" in
+        INFO|WARN|WARNING|CRIT|CRITICAL|ERROR)
+            send_alert "${arg1^^}" "$arg2"
+            ;;
+        *)
+            # Nếu $1 là tiêu đề tự do (ví dụ từ systemd service: "[TaskOps] todo-backup thất bại..."):
+            send_alert "CRIT" "${arg1}: ${arg2}"
+            ;;
+    esac
 fi
