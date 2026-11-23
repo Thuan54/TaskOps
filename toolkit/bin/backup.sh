@@ -23,6 +23,18 @@ cd /
 : "${MIN_FREE_MB:=500}"
 : "${RETENTION_DAYS:=7}"
 
+# ===== CẤU HÌNH ĐỒNG BỘ SANG VM2 (F10 - Rsync) =====
+# Hostname hoặc IP của VM2 (theo tài liệu: todo-backup hoặc 192.168.56.20)
+: "${REMOTE_BACKUP_HOST:=todo-backup}"
+# Thư mục đích nhận bản sao lưu trên VM2
+: "${REMOTE_BACKUP_DIR:=/srv/backup/incoming/}"
+# User SSH trên VM2 (để trống nếu dùng user hiện tại hoặc cấu hình trong ~/.ssh/config)
+: "${REMOTE_BACKUP_USER:=}"
+# Đường dẫn file SSH key riêng biệt (nếu có, ví dụ ~/.ssh/id_ed25519_taskops)
+: "${SSH_KEY:=}"
+# Biến cờ bật/tắt đồng bộ: 1 = bật (mặc định), 0 = tắt (hữu ích khi test lab chưa có VM2)
+: "${SYNC_ENABLED:=1}"
+
 # ===== HÀM LOG & LỖI DỰ PHÒNG (nếu chưa nạp lib/common.sh) =====
 if ! declare -F log >/dev/null; then
     log() { printf '%s [%s] %s\n' "$(date '+%F %T')" "$1" "$2" >&2; }
@@ -95,7 +107,7 @@ preflight() {
     log INFO "Preflight OK (còn trống ${free_mb}MB)"
 }
 
-# RETENTION: xóa bản backup tồn tại quá lâu
+# RETENTION: xóa bản backup tồn tại quá lâu (F09)
 apply_retention() {
     # RETENTION_DAYS phải là số nguyên >= 1
     if ! [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( RETENTION_DAYS < 1 )); then
@@ -117,6 +129,57 @@ apply_retention() {
                   -mmin +"$max_age_min" -print0)
 
     log INFO "Retention xong: đã xóa ${deleted} bản"
+}
+
+# F10: Đồng bộ bản sao lưu sang VM2 bằng Rsync qua kết nối SSH
+sync_to_remote() {
+    local archive_path="$1"
+
+    # Kiểm tra xem tính năng đồng bộ có đang được bật hay không
+    if [[ "${SYNC_ENABLED}" != "1" ]]; then
+        log INFO "Đồng bộ từ xa (F10) đang tắt (SYNC_ENABLED != 1), bỏ qua bước rsync"
+        return 0
+    fi
+
+    # Kiểm tra máy đã cài đặt tiện ích rsync chưa
+    if ! command -v rsync >/dev/null 2>&1; then
+        log WARN "Không tìm thấy công cụ rsync trên hệ thống, bỏ qua đồng bộ sang VM2"
+        return 1
+    fi
+
+    log INFO "Bắt đầu đồng bộ bản sao lưu sang VM2 ($REMOTE_BACKUP_HOST)..."
+
+    # Tạo địa chỉ đích theo cú pháp rsync: [user@]host:thư_mục_đích
+    local destination
+    if [[ -n "${REMOTE_BACKUP_USER}" ]]; then
+        destination="${REMOTE_BACKUP_USER}@${REMOTE_BACKUP_HOST}:${REMOTE_BACKUP_DIR}"
+    else
+        destination="${REMOTE_BACKUP_HOST}:${REMOTE_BACKUP_DIR}"
+    fi
+
+    # Cấu hình các tham số bảo vệ cho SSH:
+    # - BatchMode=yes: Không dừng lại hỏi mật khẩu nếu SSH key chưa được thiết lập (tránh treo script tự động)
+    # - ConnectTimeout=10: Hết thời gian chờ sau 10 giây nếu VM2 không phản hồi
+    # - StrictHostKeyChecking=accept-new: Tự động lưu fingerprint của host mới mà không làm gián đoạn
+    local ssh_opts=(-o "BatchMode=yes" -o "ConnectTimeout=10" -o "StrictHostKeyChecking=accept-new")
+    if [[ -n "${SSH_KEY}" && -f "${SSH_KEY}" ]]; then
+        ssh_opts+=(-i "${SSH_KEY}")
+    fi
+
+    # Tiến hành chạy rsync:
+    # -a: chế độ archive (giữ nguyên quyền phân quyền, ngày giờ sửa đổi, ownership)
+    # -z: nén dữ liệu trong lúc truyền qua mạng để tiết kiệm băng thông
+    # --partial: cho phép truyền tiếp dữ liệu nếu kết nối mạng bị ngắt quãng giữa chừng
+    # -e: truyền lệnh SSH kèm các cờ an toàn đã thiết lập ở trên
+    if rsync -az --partial -e "ssh ${ssh_opts[*]}" "$archive_path" "$destination"; then
+        log INFO "Đã đồng bộ thành công sang VM2: $destination"
+        return 0
+    else
+        # Nếu rsync thất bại (do mạng đứt hoặc VM2 tắt), script chỉ ghi cảnh báo WARN
+        # chứ KHÔNG làm chết tiến trình backup vì bản sao lưu cục bộ đã tạo xong an toàn.
+        log WARN "Đồng bộ Rsync sang VM2 thất bại (kiểm tra SSH key hoặc kết nối tới $REMOTE_BACKUP_HOST)"
+        return 1
+    fi
 }
 
 # Luồng backup chính
@@ -154,6 +217,12 @@ main() {
     size=$(du -h "$final" | cut -f1)
     log INFO "Backup xong: $final ($size)"
 
+    # F10: Đồng bộ bản sao lưu sang VM2 qua Rsync
+    if ! sync_to_remote "$final"; then
+        log WARN "Đồng bộ sang VM2 không thành công nhưng bản sao lưu cục bộ đã hoàn tất"
+    fi
+
+    # F09: Áp dụng chính sách lưu giữ (Retention policy)
     # Retention lỗi thì chỉ cảnh báo, vì bản backup mới vẫn hợp lệ.
     if ! apply_retention; then
         log WARN "Retention gặp lỗi, backup mới vẫn hợp lệ"
