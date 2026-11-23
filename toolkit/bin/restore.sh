@@ -16,20 +16,39 @@
 # -e: lệnh lỗi thì dừng; -u: biến chưa khai báo thì lỗi; pipefail: lỗi trong pipe tính là lỗi
 set -Eeuo pipefail
 
-# ===== CẤU HÌNH (sau này do lib/config.sh cung cấp) =====
-: "${DB_NAME:=taskops_db}"
-: "${DB_APP_USER:=taskops_user}"            # role của ứng dụng (quyền tối thiểu)
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+LIB_DIR="$(cd -- "$SCRIPT_DIR/../lib" &>/dev/null && pwd)"
+
+if [[ -f "$LIB_DIR/common.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$LIB_DIR/common.sh"
+fi
+
+# ===== CẤU HÌNH (hỗ trợ biến môi trường hoặc cấu hình mặc định) =====
+: "${DB_NAME:=taskops}"
+: "${DB_APP_USER:=taskops_app}"            # role của ứng dụng (quyền tối thiểu)
 : "${WEB_APP_DIR:=/var/www/taskops-app}"
 : "${WEB_STATUS_DIR:=/var/www/taskops-status}"
 : "${BACKUP_DIR:=/srv/backup}"
 : "${MIN_FREE_MB:=500}"
 : "${CHECK_TABLE:=tasks}"                   # bảng dùng để đếm dòng kiểm chứng
 
-# ===== HÀM TẠM (sau này thay bằng lib/common.sh của F1) =====
-# Log ghi ra stderr, giống backup.sh
-log() { printf '%s [%s] %s\n' "$(date '+%F %T')" "$1" "$2" >&2; }
-# báo lỗi rồi dừng script
-die() { log ERROR "$1"; exit 1; }
+# ===== HÀM LOG & LỖI DỰ PHÒNG (nếu chưa nạp lib/common.sh) =====
+if ! declare -F log >/dev/null; then
+    log() { printf '%s [%s] %s\n' "$(date '+%F %T')" "$1" "$2" >&2; }
+fi
+if ! declare -F die >/dev/null; then
+    die() {
+        local code=1 msg=""
+        if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+            code="$1"
+            shift
+        fi
+        msg="$*"
+        log ERROR "$msg"
+        exit "$code"
+    }
+fi
 
 # chạy 1 lệnh bất kì dưới quyền postgres
 as_postgres() { ( cd / && sudo -u postgres "$@" ); }
@@ -38,14 +57,11 @@ pg() { as_postgres psql -X -v ON_ERROR_STOP=1 "$@"; }
 
 # ===== BIẾN TOÀN CỤC DÙNG CHO DỌN DẸP =====
 WORK_DIR=""            # thư mục tạm giải nén archive
-TMP_DB=""  # tên database tạm (rỗng khi không còn tồn tại)
-STAGING_DIRS=() # các thư mục tạm khi đổi chỗ web
+TMP_DB=""              # tên database tạm (rỗng khi không còn tồn tại)
+STAGING_DIRS=()        # các thư mục tạm khi đổi chỗ web
 
 cleanup() {
-    # Chạy khi thoát (thành công hay lỗi)
     local s
-
-    # dọn dẹp các thư mục trong STAGING_DIRS
     for s in "${STAGING_DIRS[@]}"; do
         [[ -d "$s" ]] && rm -rf "$s"
     done
@@ -55,12 +71,14 @@ cleanup() {
         pg -d postgres -c "DROP DATABASE IF EXISTS \"$TMP_DB\" WITH (FORCE)" >/dev/null 2>&1 || true
     fi
 
-    # dọn dẹp thư mục làm việc chính
     if [[ -n "$WORK_DIR" && -d "$WORK_DIR" ]]; then
         rm -rf "$WORK_DIR"
     fi
 }
-on_error() { log ERROR "Restore thất bại ở dòng $1"; }
+on_error() {
+    local line="$1"
+    log ERROR "Restore thất bại ở dòng $line"
+}
 
 trap 'on_error $LINENO' ERR
 trap cleanup EXIT
@@ -111,22 +129,21 @@ parse_args() {
 
 # kiểm tra các điều kiện cần thiết trước khi restore
 preflight() {
-    # chạy script với quyền root
-    if [[ $EUID -ne 0 ]]; then
+    # Kiểm tra quyền root (ưu tiên hàm validate nếu có)
+    if declare -F require_root >/dev/null; then
+        require_root
+    elif [[ $EUID -ne 0 ]]; then
         die "Cần chạy bằng root (sudo)"
     fi
 
-    # kiểm tra bản backup có tồn tại hay không
     if [[ ! -d "$BACKUP_DIR" || ! -w "$BACKUP_DIR" ]]; then
         die "Thư mục backup không tồn tại hoặc không ghi được: $BACKUP_DIR"
     fi
 
-    # Kiểm tra database có đang chạy không
     if [[ "$MODE" != "web" ]] && ! pg_isready -q; then
         die "PostgreSQL không sẵn sàng"
     fi
 
-    # kiểm tra dung lượng ổ đĩa tối thiểu
     local free_mb
     free_mb=$(df --output=avail -BM "$BACKUP_DIR" | tail -n 1 | tr -dc '0-9')
     if (( free_mb < MIN_FREE_MB )); then
@@ -135,7 +152,7 @@ preflight() {
     log INFO "Preflight OK (còn trống ${free_mb}MB)"
 }
 
-# Chọn (hệ thống tự chọn hoặc người dùng chủ động truyền qua tham số) và kiểm tra bản backup
+# Chọn và kiểm tra bản backup
 select_archive() {
     if [[ -z "$ARCHIVE" ]]; then
         ARCHIVE=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'taskops_backup_*.tar' \
@@ -143,9 +160,7 @@ select_archive() {
         [[ -n "$ARCHIVE" ]] || die "Không tìm thấy bản backup nào trong $BACKUP_DIR"
         log INFO "Không chỉ định -f, dùng bản mới nhất: $ARCHIVE"
     fi
-    # kiểm tra xem file có tồn tại hay không
     [[ -f "$ARCHIVE" ]] || die "Không tìm thấy file archive: $ARCHIVE"
-    # Đổi sang đường dẫn tuyệt đối để không phụ thuộc thư mục hiện tại
     ARCHIVE=$(realpath -- "$ARCHIVE")
 }
 
@@ -154,32 +169,26 @@ validate_and_extract() {
     local members list m
     members=(db.sql.gz web_app.tar.gz web_status.tar.gz)
 
-    # liệt kê danh sách các file
     list=$(tar -tf "$ARCHIVE") || die "Archive không đọc được (hỏng?): $ARCHIVE"
 
-    # kiểm tra trong bản backup có thiếu file nào không
     for m in "${members[@]}"; do
         grep -qxF "$m" <<<"$list" || die "Archive thiếu thành phần bắt buộc: $m"
     done
 
-    # tạo thư mục làm việc tạm thời
     WORK_DIR=$(mktemp -d "$BACKUP_DIR/.restore.XXXXXX")
-    # giải nén 3 file trong bản backup
     tar -xf "$ARCHIVE" -C "$WORK_DIR" "${members[@]}"
 
-    # kiểm tra tính toàn vẹn của từng file
     gzip -t "$WORK_DIR/db.sql.gz"                 || die "db.sql.gz bị hỏng"
     tar -tzf "$WORK_DIR/web_app.tar.gz" >/dev/null    || die "web_app.tar.gz bị hỏng"
     tar -tzf "$WORK_DIR/web_status.tar.gz" >/dev/null || die "web_status.tar.gz bị hỏng"
     log INFO "Archive hợp lệ: $ARCHIVE"
 }
 
-# hàm yêu cầu xác nhận từ người dùng trước khi thực hiện backup
-confirm() {
+# hàm yêu cầu xác nhận từ người dùng trước khi thực hiện restore
+confirm_action() {
     if (( ASSUME_YES )); then
         return 0
     fi
-    # Không có terminal (cron, systemd) mà không có -y thì không thể hỏi -> dừng cho an toàn
     if [[ ! -t 0 ]]; then
         die "Không có terminal để xác nhận. Dùng -y nếu chắc chắn muốn khôi phục"
     fi
@@ -192,48 +201,48 @@ confirm() {
     fi
 }
 
-# chụp lại toàn bộ hiện trạng hệ thống ngay tại thời điểm trước khi restore và đóng gói thành một file sao lưu tạm
+# chụp lại toàn bộ hiện trạng hệ thống trước khi restore
 safety_backup() {
     local ts safety out d
     ts=$(date +%F_%H%M%S)
-    # tạo 1 thư mục con tên là safety
     safety="$WORK_DIR/safety"
     mkdir -p "$safety"
-    out="$BACKUP_DIR/pre_restore_${ts}.tar"
 
-    # backup database hiện tại
+    log INFO "Tạo bản sao lưu an toàn trước khi khôi phục"
+
     if [[ "$MODE" != "web" ]]; then
-        if [[ "$(pg -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'")" == "1" ]]; then
-            # DB có tồn tại thì BẮT BUỘC dump được, nếu không thì dừng (không dám ghi đè)
-            as_postgres pg_dump "$DB_NAME" | gzip > "$safety/db.sql.gz"
-            gzip -t "$safety/db.sql.gz"
+        if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+            sudo -u postgres pg_dump "$DB_NAME" | gzip > "$safety/db.sql.gz"
         else
-            # Trường hợp demo: DB đã bị xóa -> không có gì để chụp
-            log WARN "Database $DB_NAME không tồn tại, bỏ qua sao lưu DB hiện tại"
+            echo "-- Database $DB_NAME chưa tồn tại trước khi restore" | gzip > "$safety/db.sql.gz"
         fi
     fi
 
-    # sao lưu các thư mục mã nguồn web
     if [[ "$MODE" != "db" ]]; then
         for d in "$WEB_APP_DIR" "$WEB_STATUS_DIR"; do
+            local base
+            base=$(basename "$d")
             if [[ -d "$d" ]]; then
-                tar -czf "$safety/$(basename "$d").tar.gz" \
-                    -C "$(dirname "$d")" "$(basename "$d")"
+                tar -czf "$safety/${base}.tar.gz" -C "$(dirname "$d")" "$base"
             else
-                log WARN "Thư mục $d không tồn tại, bỏ qua sao lưu thư mục này"
+                tar -czf "$safety/${base}.tar.gz" --files-from /dev/null
             fi
         done
+        mv "$safety/$(basename "$WEB_APP_DIR").tar.gz"    "$safety/web_app.tar.gz"
+        mv "$safety/$(basename "$WEB_STATUS_DIR").tar.gz" "$safety/web_status.tar.gz"
     fi
 
-    tar -cf "$out" -C "$safety" .
-    # chỉ có root mới được phép đọc, ghi
+    [[ -f "$safety/db.sql.gz" ]]         || echo "-- dummy" | gzip > "$safety/db.sql.gz"
+    [[ -f "$safety/web_app.tar.gz" ]]    || tar -czf "$safety/web_app.tar.gz" --files-from /dev/null
+    [[ -f "$safety/web_status.tar.gz" ]] || tar -czf "$safety/web_status.tar.gz" --files-from /dev/null
+
+    out="$BACKUP_DIR/pre_restore_${ts}.tar"
+    tar -cf "$out" -C "$safety" db.sql.gz web_app.tar.gz web_status.tar.gz
     chmod 600 "$out"
     log INFO "Đã lưu trạng thái hiện tại để phòng khi cần quay lại: $out"
 }
 
-# Đảm bảo role của ứng dụng tồn tại. Role là đối tượng TOÀN CỤC của PostgreSQL,
-# KHÔNG nằm trong pg_dump của một database, nên mất role thì dump không tự tạo lại.
-# Thiếu role mà dump có lệnh GRANT ... TO taskops_user thì nạp dump sẽ lỗi.
+# Đảm bảo role của ứng dụng tồn tại
 ensure_app_role() {
     local exists
     exists=$(pg -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_APP_USER'")
@@ -249,23 +258,19 @@ restore_database() {
     log INFO "Khôi phục database $DB_NAME"
     ensure_app_role
 
-    # Bước 1: nạp dump vào DB TẠM. Nếu hỏng giữa chừng, DB thật chưa bị đụng tới.
-    TMP_DB="${DB_NAME}_restore_$$"      # $$ = PID của script, tránh trùng tên
+    TMP_DB="${DB_NAME}_restore_$$"
     pg -d postgres -c "CREATE DATABASE \"$TMP_DB\"" >/dev/null
     zcat "$WORK_DIR/db.sql.gz" | pg --single-transaction -q -d "$TMP_DB" >/dev/null
 
-    # Bước 2: kiểm tra DB tạm có bảng thật, tránh thay DB thật bằng một DB rỗng
     local tables
     tables=$(pg -d "$TMP_DB" -tAc \
         "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")
     (( tables > 0 )) || die "Dump nạp xong nhưng không có bảng nào, hủy để bảo vệ DB hiện tại"
 
-    # Bước 3: thay DB thật bằng DB tạm.
     pg -d postgres -c "DROP DATABASE IF EXISTS \"$DB_NAME\" WITH (FORCE)" >/dev/null
     pg -d postgres -c "ALTER DATABASE \"$TMP_DB\" RENAME TO \"$DB_NAME\"" >/dev/null
-    TMP_DB=""    # DB tạm đã thành DB thật, cleanup không được xóa nó nữa
+    TMP_DB=""
 
-    # Bước 4: cấp lại quyền tối thiểu cho role ứng dụng
     pg -d "$DB_NAME" >/dev/null <<SQL
 GRANT CONNECT ON DATABASE "$DB_NAME" TO "$DB_APP_USER";
 GRANT USAGE ON SCHEMA public TO "$DB_APP_USER";
@@ -282,15 +287,12 @@ restore_web_dir() {
     parent=$(dirname "$target")
     base=$(basename "$target")
 
-    # Giải nén ra thư mục tạm CÙNG ổ đĩa với đích để mv ở dưới là tức thời
     stage=$(mktemp -d "$parent/.restore.XXXXXX")
     STAGING_DIRS+=("$stage")
 
-    # Chạy bằng root nên tar giữ nguyên chủ sở hữu và quyền (vd www-data) như lúc backup
     tar -xzf "$tarball" -C "$stage"
     [[ -d "$stage/$base" ]] || die "Tarball không chứa thư mục '$base' như mong đợi: $tarball"
 
-    # Đưa bản cũ sang chỗ tạm, đưa bản khôi phục vào, rồi cleanup xóa bản cũ
     if [[ -d "$target" ]]; then
         mv "$target" "$stage/old"
     fi
@@ -308,12 +310,10 @@ restore_web() {
 # kiểm chứng sau khi khôi phục
 verify() {
     local rows files d
-    # kiểm chứng cơ sở dữ liệu
     if [[ "$MODE" != "web" ]]; then
         rows=$(pg -d "$DB_NAME" -tAc "SELECT count(*) FROM \"$CHECK_TABLE\"")
         log INFO "Kiểm chứng DB: bảng $CHECK_TABLE có $rows dòng"
     fi
-    # kiểm chứng mã nguồn web
     if [[ "$MODE" != "db" ]]; then
         for d in "$WEB_APP_DIR" "$WEB_STATUS_DIR"; do
             [[ -d "$d" ]] || die "Kiểm chứng thất bại: thiếu thư mục $d"
@@ -328,8 +328,8 @@ main() {
     parse_args "$@"
     preflight
     select_archive
-    validate_and_extract     # kiểm tra kỹ TRƯỚC khi đụng vào hệ thống
-    confirm
+    validate_and_extract
+    confirm_action
     safety_backup
 
     if [[ "$MODE" != "web" ]]; then restore_database; fi
