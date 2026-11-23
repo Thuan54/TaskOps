@@ -1,0 +1,10 @@
+[Unit]
+Description=TaskOps System Healthcheck Service
+After=network.target postgresql.service nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/taskops-toolkit/bin/healthcheck.sh
+User=root
+StandardOutput=journal
+StandardError=journal

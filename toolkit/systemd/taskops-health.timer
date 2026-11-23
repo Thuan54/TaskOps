@@ -1,0 +1,12 @@
+[Unit]
+Description=Run TaskOps Healthcheck Periodically
+Requires=taskops-health.service
+
+[Timer]
+# Chạy định kỳ mỗi 15 phút
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
