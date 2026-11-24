@@ -1,6 +1,6 @@
-# /etc/systemd/system/todo-backup.service
+# /etc/systemd/system/taskops-backup.service
 # Chạy sao lưu TaskOps (DB + web, nén, retention, rsync sang VM2) thông qua toolkit.
-# Được todo-backup.timer kích hoạt lúc 02:00 mỗi ngày; có thể chạy tay: systemctl start todo-backup.service
+# Được taskops-backup.timer kích hoạt lúc 02:00 mỗi ngày; có thể chạy tay: systemctl start taskops-backup.service
 [Unit]
 Description=TaskOps - Sao lưu hằng ngày (DB + web, retention 7 ngày, rsync sang VM2)
 Documentation=file:/opt/taskops-toolkit/toolkit.sh
@@ -17,14 +17,14 @@ Group=root
 ExecStart=/usr/bin/bash /opt/taskops-toolkit/toolkit.sh backup
 # Log của toolkit ghi vào /var/log/taskops/toolkit.log; stdout/stderr đồng thời vào journald
 Environment=TASKOPS_LOG_DIR=/var/log/taskops
-SyslogIdentifier=todo-backup
+SyslogIdentifier=taskops-backup
 StandardOutput=journal
 StandardError=journal
 # Không làm chậm dịch vụ web trong lúc sao lưu
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=2h
-# Khi sao lưu thất bại (SERVICE_RESULT khác success: script thoát khác 0, quá thời gian...) thì gửi cảnh báo qua alert.sh (F13).
-# GIẢ ĐỊNH: alert.sh nhận 2 tham số (tiêu đề, nội dung); chỉnh cho khớp alert.sh thật.
-# Dấu '-' ở đầu: lỗi của alert.sh không làm đổi kết quả của service. $$ là cách viết ký tự $ trong file unit.
-ExecStopPost=-/usr/bin/bash -c 'if [ "$$SERVICE_RESULT" != "success" ]; then exec /usr/bin/bash /opt/taskops-toolkit/alert.sh "[TaskOps] %n thất bại trên %H" "Kết quả: $$SERVICE_RESULT. Xem: journalctl -u %n -n 50 --no-pager"; fi'
+# Khi sao lưu thất bại (SERVICE_RESULT khác success: script thoát khác 0, quá thời gian...) thì gửi cảnh báo.
+# Dùng send_alert <MỨC> <NỘI DUNG> trong lib/alert.sh (F13; kênh Telegram hoặc msmtp, luôn trả về 0).
+# Dấu '-' ở đầu: lỗi khi gửi cảnh báo không làm đổi kết quả của service. $$ là cách viết ký tự $ trong file unit.
+ExecStopPost=-/usr/bin/bash -c 'if [ "$$SERVICE_RESULT" != "success" ]; then LOG_COMPONENT=taskops-backup-alert; . /opt/taskops-toolkit/lib/common.sh && . /opt/taskops-toolkit/lib/alert.sh && send_alert CRIT "%n thất bại trên %H (kết quả: $$SERVICE_RESULT). Xem: journalctl -u %n -n 50 --no-pager"; fi'
