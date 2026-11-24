@@ -1,12 +1,12 @@
 [Unit]
-Description=Run TaskOps Healthcheck Periodically
-Requires=taskops-health.service
+Description=TaskOps - Lap lich kiem tra suc khoe he thong dinh ky (15 phut)
 
 [Timer]
-# Chạy định kỳ mỗi 15 phút
+# Chay dinh ky moi 15 phut sau khi boot 2 phut
 OnBootSec=2min
 OnUnitActiveSec=15min
 Persistent=true
+Unit=taskops-health.service
 
 [Install]
 WantedBy=timers.target

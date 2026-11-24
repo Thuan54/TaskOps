@@ -1,10 +1,11 @@
 [Unit]
-Description=TaskOps System Healthcheck Service
+Description=TaskOps - Kiem tra suc khoe he thong dinh ky (F12)
+Documentation=file:/opt/taskops-toolkit/bin/healthcheck.sh
 After=network.target postgresql.service nginx.service
 
 [Service]
 Type=oneshot
-ExecStart=/opt/taskops-toolkit/bin/healthcheck.sh
 User=root
+ExecStart=/usr/bin/bash /opt/taskops-toolkit/bin/healthcheck.sh
 StandardOutput=journal
 StandardError=journal
