@@ -27,6 +27,23 @@ function isTaskId(value: string): boolean {
 app.use(express.json());
 
 app.get(
+  "/api/health",
+  asyncRoute(async (_request, response) => {
+    try {
+      await pool.query("SELECT 1");
+      response.json({ status: "ok", backend: "ok", database: "ok" });
+    } catch (error) {
+      console.error("Database health check failed:", error);
+      response.status(503).json({
+        status: "degraded",
+        backend: "ok",
+        database: "unavailable",
+      });
+    }
+  }),
+);
+
+app.get(
   "/api/todos",
   asyncRoute(async (_request, response) => {
     const result = await pool.query(
@@ -132,16 +149,6 @@ app.use((error: unknown, _request: Request, response: Response, _next: (error?: 
   }
 });
 
-async function startServer() {
-  await pool.query("SELECT 1");
-  app.listen(port, host, () => {
-    console.log(`TaskOps is listening at http://${host}:${port}`);
-  });
-}
-
-void startServer().catch((error: unknown) => {
-  console.error("Could not connect to PostgreSQL:", error);
-  void pool.end().finally(() => {
-    process.exitCode = 1;
-  });
+app.listen(port, host, () => {
+  console.log(`TaskOps is listening at http://${host}:${port}`);
 });

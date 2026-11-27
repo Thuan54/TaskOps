@@ -39,7 +39,7 @@
 | **Web Root (App)** | `/var/www/taskops-app/` | Mode `0755`, owner `www-data:www-data` | M2, M3 |
 | **Web Root (Status)** | `/var/www/taskops-status/` | Mode `0755`, owner `www-data:www-data` | M2, M5 |
 | **SSL Certs / CA** | `/etc/ssl/taskops/` | Mode `0700`, owner `root:root` | M2 (Security) |
-| **Environment Secrets** | `/etc/taskops/taskops.env` | **Mode `0600` or `0640`**, owner `root:taskops` | M3, M5 |
+| **Environment Secrets** | `/etc/taskops/taskops.env` | **Mode `0640`**, owner `root:taskops`; never commit the populated file | M3, M5 |
 
 ---
 
@@ -60,7 +60,7 @@
 
 | Unit Name | Type | Description |
 | :--- | :---: | :--- |
-| `taskops.service` | Service | Backend Node.js process (`Restart=on-failure`, journald) |
+| `taskops.service` | Service | Runs `/opt/taskops/app/dist/server.js` as `taskops`; loads `/etc/taskops/taskops.env`, restarts on failure, logs to journald |
 | `taskops-backup.service` | Service | Executes `/opt/taskops-toolkit/bin/backup.sh` |
 | `taskops-backup.timer` | Timer | Schedules daily backup at `02:00:00` |
 | `taskops-health.service` | Service | Executes `/opt/taskops-toolkit/bin/healthcheck.sh` |

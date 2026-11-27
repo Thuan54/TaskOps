@@ -17,6 +17,7 @@ toolkit/
 │   ├── toolkit.conf              # paths, retention days, rsync target
 │   └── health.conf               # thresholds
 └── systemd/
+    ├── taskops.service
     ├── taskops-backup.service
     ├── taskops-backup.timer
     ├── taskops-health.service
@@ -25,6 +26,10 @@ toolkit/
     └── taskops-status.timer
 
 ```
+
+The backend runs as the unprivileged `taskops` account. Its unit reads
+`/etc/taskops/taskops.env`; use `conf/taskops.env.example` as the template,
+owned by `root:taskops` with mode `0640`. See `app/README.md` for setup.
 
 ## Log rotation and status page (F14)
 
