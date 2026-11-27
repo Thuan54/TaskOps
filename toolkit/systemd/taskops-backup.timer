@@ -1,0 +1,15 @@
+# /etc/systemd/system/taskops-backup.timer
+# Lịch sao lưu: mỗi ngày lúc 02:00 (theo múi giờ của VM; VM nên đặt Asia/Ho_Chi_Minh).
+[Unit]
+Description=TaskOps - Lịch sao lưu hằng ngày lúc 02:00
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+# Nếu VM tắt đúng 02:00 thì chạy bù ngay khi bật lại
+Persistent=true
+# Mặc định systemd có thể lệch tới 1 phút; đặt 1 giây để dễ kiểm chứng khi demo
+AccuracySec=1s
+Unit=taskops-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+kbdinteractiveauthentication no
+allowusers nguyennhat
+authenticationmethods publickey

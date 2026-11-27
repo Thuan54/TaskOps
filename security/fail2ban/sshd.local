@@ -1,0 +1,12 @@
+# G02 - SSH protection for the personal TaskOps lab.
+[sshd]
+enabled = true
+port = 22
+filter = sshd
+backend = systemd
+
+maxretry = 5
+findtime = 10m
+bantime = 5m
+
+ignoreip = 127.0.0.1/8 ::1
