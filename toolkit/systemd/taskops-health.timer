@@ -1,0 +1,12 @@
+[Unit]
+Description=TaskOps - Lap lich kiem tra suc khoe he thong dinh ky (15 phut)
+
+[Timer]
+# Chay dinh ky moi 15 phut sau khi boot 2 phut
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+Unit=taskops-health.service
+
+[Install]
+WantedBy=timers.target
