@@ -1,0 +1,28 @@
+[Unit]
+Description=TaskOps Backend API
+Documentation=file:/opt/taskops/app/README.md
+Wants=network-online.target postgresql.service
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=taskops
+Group=taskops
+WorkingDirectory=/opt/taskops/app
+EnvironmentFile=/etc/taskops/taskops.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/taskops/app/dist/server.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=taskops
+
+[Install]
+WantedBy=multi-user.target
