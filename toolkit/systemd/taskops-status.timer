@@ -1,0 +1,10 @@
+[Unit]
+Description=TaskOps - Cap nhat trang thai moi 5 phut
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Unit=taskops-status.service
+
+[Install]
+WantedBy=timers.target

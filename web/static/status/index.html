@@ -10,8 +10,6 @@
             --card-bg: #ffffff;
             --text-main: #20251f;
             --text-muted: #858b82;
-            --green: #2e7d32;
-            --green-bg: #e8f5e9;
             --border: #e0e2dc;
         }
         body {
@@ -40,25 +38,6 @@
             color: var(--text-muted);
             margin: 0;
             font-size: 15px;
-        }
-        .banner {
-            background-color: var(--green-bg);
-            color: var(--green);
-            padding: 16px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
-            border: 1px solid #c8e6c9;
-        }
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            background-color: var(--green);
-            border-radius: 50%;
-            display: inline-block;
         }
         .card {
             background: var(--card-bg);
@@ -89,11 +68,6 @@
         .service-name {
             font-weight: 500;
         }
-        .service-status {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--green);
-        }
         .footer {
             margin-top: 32px;
             text-align: center;
@@ -106,28 +80,13 @@
     <div class="container">
         <div class="header">
             <h1>TaskOps Status</h1>
-            <p>Live infrastructure and service health</p>
-        </div>
-
-        <div class="banner">
-            <span class="status-dot"></span>
-            All Systems Operational
+            <p>Generated service health is published as status.html.</p>
         </div>
 
         <div class="card">
-            <h2>Core Services</h2>
-            <div class="service-row">
-                <span class="service-name">Nginx Web Server</span>
-                <span class="service-status">Operational</span>
-            </div>
-            <div class="service-row">
-                <span class="service-name">TaskOps Backend API (127.0.0.1:5000)</span>
-                <span class="service-status">Operational</span>
-            </div>
-            <div class="service-row">
-                <span class="service-name">PostgreSQL Database (127.0.0.1:5432)</span>
-                <span class="service-status">Operational</span>
-            </div>
+            <h2>Status report pending</h2>
+            <p>The automatic status report has not been generated yet. Check the
+                <code>taskops-status.service</code> logs and timer.</p>
         </div>
 
         <div class="footer">

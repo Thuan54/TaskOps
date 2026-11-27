@@ -11,7 +11,8 @@ toolkit/
 │   ├── backup.sh
 │   ├── restore.sh
 │   ├── healthcheck.sh
-│   └── logrotate.sh
+│   ├── logrotate.sh
+│   └── status.sh                   # Generates /var/www/taskops-status/status.html
 ├── conf/
 │   ├── toolkit.conf              # paths, retention days, rsync target
 │   └── health.conf               # thresholds
@@ -19,6 +20,22 @@ toolkit/
     ├── taskops-backup.service
     ├── taskops-backup.timer
     ├── taskops-health.service
-    └── taskops-health.timer
+    ├── taskops-health.timer
+    ├── taskops-status.service
+    └── taskops-status.timer
 
 ```
+
+## Log rotation and status page (F14)
+
+Install `logrotate` and copy `conf/taskops-logrotate.conf` to
+`/etc/logrotate.d/taskops`. The `logrotate` toolkit command then uses the
+system-wide logrotate state, rotating `/var/log/taskops/toolkit.log` weekly,
+keeping four rotations, and compressing older files.
+
+Install `systemd/taskops-status.service` and
+`systemd/taskops-status.timer` into `/etc/systemd/system`, then enable the
+timer with `systemctl enable --now taskops-status.timer`. It publishes a fresh
+`/var/www/taskops-status/status.html` at boot and every five minutes.
+`status.local` serves this generated report first; the bundled `index.html`
+is only a fallback that does not claim services are healthy.

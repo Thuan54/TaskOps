@@ -65,3 +65,5 @@
 | `taskops-backup.timer` | Timer | Schedules daily backup at `02:00:00` |
 | `taskops-health.service` | Service | Executes `/opt/taskops-toolkit/bin/healthcheck.sh` |
 | `taskops-health.timer` | Timer | Triggers healthcheck every 5 minutes |
+| `taskops-status.service` | Service | Generates `/var/www/taskops-status/status.html` |
+| `taskops-status.timer` | Timer | Updates the status page at boot and every 5 minutes |

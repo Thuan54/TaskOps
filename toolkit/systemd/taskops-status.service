@@ -1,0 +1,11 @@
+[Unit]
+Description=TaskOps - Cap nhat trang thai dich vu
+Documentation=file:/opt/taskops-toolkit/bin/status.sh
+After=nginx.service postgresql.service taskops.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/bash /opt/taskops-toolkit/bin/status.sh
+StandardOutput=journal
+StandardError=journal
